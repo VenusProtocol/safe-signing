@@ -2,67 +2,133 @@
 
 import { useState } from "react";
 import { ConnectKitButton } from "connectkit";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useSendTransaction } from "wagmi";
 import { abi } from "./safeWalletAbi";
 import { SAFE_WALLET_CONTRACT_ADDRESS } from "./constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
-  const [hash, setHash] = useState<string>("");
-  const [transactionSentHash, setTransactionSentHash] = useState<string>("");
-  const { isConnected } = useAccount();
-  const { writeContractAsync, isPending } = useWriteContract();
+	const [approveFormValues, setApproveFormValues] = useState<{
+		hash: string;
+	}>({
+		hash: "",
+	});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+	const [executeFormValues, setExecuteFormValues] = useState<{
+		hash: string;
+	}>({
+		hash: "",
+	});
 
-    try {
-      const transactionHash = await writeContractAsync({
-        address: SAFE_WALLET_CONTRACT_ADDRESS,
-        abi,
-        functionName: "approveHash",
-        args: [hash as `0x${string}`],
-      });
+	const [transactionSentHash, setTransactionSentHash] = useState<string>("");
+	const { isConnected } = useAccount();
 
-      setTransactionSentHash(transactionHash);
-    } catch (error) {
-      alert(error);
-    }
-  };
+	const { writeContractAsync, isPending: isWriteContractPending } =
+		useWriteContract();
+	const { sendTransactionAsync, isPending: isSendTransactionPending } =
+		useSendTransaction();
 
-  return (
-    <div className="flex items-center justify-center min-h-screen p-8 pb-20 sm:p-20">
-      <main className="flex flex-col gap-3 items-center sm:items-start w-full max-w-[500px]">
-        <ConnectKitButton />
+	const isPending = isWriteContractPending || isSendTransactionPending;
 
-        {isConnected && (
-          <>
-            <form
-              onSubmit={handleSubmit}
-              className="flex flex-col gap-3 w-full"
-            >
-              <Input
-                className="block w-full"
-                name="hash"
-                value={hash}
-                onChange={(e) => setHash(e.currentTarget.value)}
-                placeholder="Enter hash here"
-              />
+	const handleApprove = async (e: React.FormEvent) => {
+		e.preventDefault();
 
-              <Button className="w-full" type="submit" disabled={isPending}>
-                {isPending ? "Sending..." : "Approve"}
-              </Button>
-            </form>
+		try {
+			const transactionHash = await writeContractAsync({
+				address: SAFE_WALLET_CONTRACT_ADDRESS,
+				abi,
+				functionName: "approveHash",
+				args: [approveFormValues.hash as `0x${string}`],
+			});
 
-            {!!transactionSentHash && (
-              <p className="text-green-500 bold text-center">
-                Transaction sent: {transactionSentHash}
-              </p>
-            )}
-          </>
-        )}
-      </main>
-    </div>
-  );
+			setTransactionSentHash(transactionHash);
+		} catch (error) {
+			alert(error);
+		}
+	};
+
+	const handleExecute = async (e: React.FormEvent) => {
+		e.preventDefault();
+
+		try {
+			const transactionHash = await sendTransactionAsync({
+				to: SAFE_WALLET_CONTRACT_ADDRESS,
+				data: executeFormValues.hash as `0x${string}`,
+			});
+
+			setTransactionSentHash(transactionHash);
+		} catch (error) {
+			alert(error);
+		}
+	};
+
+	return (
+		<div className="flex items-center justify-center min-h-screen p-8 pb-20 sm:p-20">
+			<main className="flex flex-col gap-6 items-center sm:items-start w-full max-w-[500px]">
+				<ConnectKitButton />
+
+				{isConnected && (
+					<div className="flex flex-col gap-4 w-full">
+						<Tabs defaultValue="approve">
+							<TabsList>
+								<TabsTrigger value="approve" disabled={isPending}>
+									Approve
+								</TabsTrigger>
+								<TabsTrigger value="execute" disabled={isPending}>
+									Execute
+								</TabsTrigger>
+							</TabsList>
+
+							<TabsContent value="approve">
+								<form onSubmit={handleApprove} className="flex flex-col gap-3">
+									<Input
+										name="hash"
+										value={approveFormValues.hash}
+										onChange={(e) =>
+											setApproveFormValues((existingValues) => ({
+												...existingValues,
+												hash: e.currentTarget.value,
+											}))
+										}
+										placeholder="Enter approve hash here"
+									/>
+
+									<Button type="submit" disabled={isPending}>
+										{isPending ? "Sending..." : "Approve"}
+									</Button>
+								</form>
+							</TabsContent>
+
+							<TabsContent value="execute">
+								<form onSubmit={handleExecute} className="flex flex-col gap-3">
+									<Input
+										name="hash"
+										value={executeFormValues.hash}
+										onChange={(e) =>
+											setExecuteFormValues({
+												hash: e.currentTarget.value,
+											})
+										}
+										placeholder="Enter execute hash here"
+									/>
+
+									<Button type="submit" disabled={isPending}>
+										{isPending ? "Sending..." : "Execute"}
+									</Button>
+								</form>
+							</TabsContent>
+						</Tabs>
+
+						{!!transactionSentHash && (
+							<p className="text-green-500 bold text-center">
+								Last transaction sent: {transactionSentHash}
+							</p>
+						)}
+					</div>
+				)}
+			</main>
+		</div>
+	);
 }
