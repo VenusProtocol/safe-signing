@@ -10,8 +10,6 @@ export default function Home() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-
-		console.log(hash);
 	};
 
 	return (
